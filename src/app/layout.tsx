@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.mucamaschile.cl"),
   title: {
     default: "Mucamas Chile | Limpieza para hoteles, Airbnb y hogares",
     template: "%s | Mucamas Chile",
@@ -26,11 +27,17 @@ export const metadata: Metadata = {
     "limpieza domicilio",
     "Mucama Express",
     "Santiago limpieza",
+    "limpieza hogar Chile",
   ],
+  alternates: {
+    canonical: "https://www.mucamaschile.cl/",
+  },
   openGraph: {
     title: "Mucamas Chile — Limpieza premium para hospedajes",
     description:
       "Reserva online y contacto por WhatsApp. Estándar hospedaje para tu propiedad en Chile.",
+    url: "https://www.mucamaschile.cl/",
+    siteName: "Mucamas Chile",
     locale: "es_CL",
     type: "website",
   },

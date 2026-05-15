@@ -1,10 +1,19 @@
 /** Datos mock y copys — fácil de editar sin tocar JSX */
 
+/**
+ * Configuración global del sitio (nombre, contacto).
+ * `SITE.whatsappE164` — número WhatsApp Business en formato E.164 sin signo + (solo dígitos).
+ */
 export const SITE = {
   name: "Mucamas Chile",
   tagline: "Limpieza profesional para tu hogar y hospedajes",
-  /** Reemplaza por tu número en formato país sin + (Chile: 56 + 9 dígitos móvil) */
-  whatsappE164: "56912345678",
+
+  /**
+   * --- SITE.whatsappE164 (WhatsApp Business, Chile) ---
+   * Reemplazar por número real de WhatsApp en formato 569XXXXXXXX
+   * (56 + código país, 9 + móvil nacional, sin espacios ni +).
+   */
+  whatsappE164: "56900000000",
 } as const;
 
 export function getWhatsAppHref(prefill?: string): string {
