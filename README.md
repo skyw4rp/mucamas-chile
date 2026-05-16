@@ -139,6 +139,199 @@ Crea un archivo **`.env.local`** en la raíz (no lo subas al repositorio). Puede
 
 ---
 
+## Contratos API
+
+Todas las respuestas son **JSON**. Los ejemplos usan datos ficticios; **`serviceType`** debe coincidir con un título válido del catálogo en `src/content/landing.ts` (p. ej. `"Airbnb y renta corta"`).
+
+### 1. `POST /api/bookings`
+
+Reserva pública. Sin cabecera admin.
+
+**Request body** (`Content-Type: application/json`):
+
+```json
+{
+  "serviceType": "Airbnb y renta corta",
+  "date": "2026-05-20",
+  "time": "10:30",
+  "comuna": "Las Condes",
+  "address": "Av. Ejemplo 123, depto 405",
+  "duration": "4 horas",
+  "fullName": "María Pérez",
+  "phone": "+56 9 1234 5678",
+  "email": "maria.perez@example.com",
+  "comments": "Checkout antes de las 12:00"
+}
+```
+
+**Response `200`** — reserva persistida:
+
+```json
+{
+  "ok": true,
+  "message": "Recibimos tu solicitud. Te contactaremos pronto."
+}
+```
+
+**Response `400`** — validación fallida (campos requeridos / email / tipo de servicio):
+
+```json
+{
+  "ok": false,
+  "errors": {
+    "fullName": ["El nombre es obligatorio."],
+    "email": ["Ingresa un email válido."]
+  }
+}
+```
+
+*(También puede devolver `400` con `{ "ok": false, "message": "..." }` si el cuerpo no es JSON válido. Errores de Supabase u otro fallo interno → **`500`** con mensaje genérico.)*
+
+---
+
+### 2. `GET /api/admin/bookings`
+
+Listado de reservas para el panel admin.
+
+**Cabeceras requeridas**
+
+| Cabecera | Valor |
+|----------|--------|
+| `x-admin-key` | Debe coincidir con `ADMIN_API_KEY` del servidor (ejemplo: `tu-clave-demo-admin`) |
+| `Accept` | `application/json` (recomendado) |
+
+**Response `200`**
+
+```json
+{
+  "ok": true,
+  "bookings": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "createdAt": "2026-05-15T14:22:00.000Z",
+      "serviceType": "Airbnb y renta corta",
+      "bookingDate": "2026-05-20",
+      "bookingTime": "10:30",
+      "comuna": "Las Condes",
+      "fullName": "María Pérez",
+      "phone": "+56 9 1234 5678",
+      "email": "maria.perez@example.com",
+      "estado": "new"
+    }
+  ]
+}
+```
+
+**Response `401`** — clave ausente o incorrecta:
+
+```json
+{
+  "ok": false,
+  "message": "No autorizado."
+}
+```
+
+*(Errores de configuración o Supabase pueden responder **`500`**.)*
+
+---
+
+### 3. `PATCH /api/admin/bookings/[id]`
+
+Actualiza la columna **`status`** de una fila en `bookings`. Sustituir `[id]` por el UUID de la reserva.
+
+**Cabeceras requeridas**
+
+| Cabecera | Valor |
+|----------|--------|
+| `x-admin-key` | Igual que en `GET /api/admin/bookings` |
+| `Content-Type` | `application/json` |
+
+**Request body**
+
+```json
+{
+  "status": "confirmed"
+}
+```
+
+**Estados permitidos** (`status`)
+
+- `new`
+- `confirmed`
+- `in_progress`
+- `completed`
+- `cancelled`
+
+**Response `200`**
+
+```json
+{
+  "ok": true,
+  "booking": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "createdAt": "2026-05-15T14:22:00.000Z",
+    "serviceType": "Airbnb y renta corta",
+    "bookingDate": "2026-05-20",
+    "bookingTime": "10:30",
+    "comuna": "Las Condes",
+    "fullName": "María Pérez",
+    "phone": "+56 9 1234 5678",
+    "email": "maria.perez@example.com",
+    "estado": "confirmed"
+  }
+}
+```
+
+**Response `400`** — JSON inválido o estado no permitido:
+
+```json
+{
+  "ok": false,
+  "message": "Estado no permitido."
+}
+```
+
+**Response `401`** — misma forma que en el listado admin.
+
+*(Otros casos: **`404`** si no existe la fila; **`500`** si falla la actualización.)*
+
+---
+
+### 4. `GET /api/admin/bookings/stats`
+
+Métricas agregadas (conteos por estado, total, ventanas temporales).
+
+**Cabeceras requeridas**
+
+| Cabecera | Valor |
+|----------|--------|
+| `x-admin-key` | Igual que en los otros endpoints admin |
+| `Accept` | `application/json` (recomendado) |
+
+**Response `200`**
+
+```json
+{
+  "ok": true,
+  "stats": {
+    "total": 42,
+    "byStatus": {
+      "new": 10,
+      "confirmed": 8,
+      "in_progress": 5,
+      "completed": 17,
+      "cancelled": 2
+    },
+    "createdToday": 3,
+    "createdLast7Days": 15
+  }
+}
+```
+
+*(Errores de auth → **`401`**; fallos de configuración o consulta → **`500`**.)*
+
+---
+
 ## Scripts útiles
 
 | Script | Uso |
