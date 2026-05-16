@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sendBookingNotification } from "@/lib/email/booking-notification";
 import type { BookingApiResponse } from "@/lib/bookings/types";
 import { mapBookingPayloadToRow } from "@/lib/bookings/db";
 import { validateBookingRequest } from "@/lib/bookings/validate";
@@ -51,6 +52,9 @@ export async function POST(request: Request): Promise<NextResponse<BookingApiRes
       { status: 500 },
     );
   }
+
+  const createdAtIso = new Date().toISOString();
+  await sendBookingNotification(result.booking, createdAtIso);
 
   return NextResponse.json(
     {
