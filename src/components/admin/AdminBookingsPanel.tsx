@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useSyncExternalStore, useState } from "react";
+import { BookingStatusControl } from "@/components/admin/BookingStatusControl";
 import type { AdminBookingDto, AdminBookingsResponse } from "@/lib/admin/booking-map";
 import {
   getAdminKeyServerSnapshot,
@@ -77,6 +78,16 @@ export function AdminBookingsPanel() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const mergeBooking = useCallback((updated: AdminBookingDto) => {
+    setBookings((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+  }, []);
+
+  const handlePatchUnauthorized = useCallback(() => {
+    persistAdminKey(null);
+    setBookings([]);
+    setError("Sesión admin inválida o expirada.");
   }, []);
 
   useEffect(() => {
@@ -225,7 +236,7 @@ export function AdminBookingsPanel() {
               <>
                 <div className="hidden overflow-hidden rounded-2xl border border-mucamas-border bg-white shadow-sm md:block">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[920px] border-collapse text-left text-sm">
+                    <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
                       <thead className="border-b border-mucamas-border bg-mucamas-surface/80">
                         <tr>
                           {[
@@ -262,7 +273,18 @@ export function AdminBookingsPanel() {
                             <td className="max-w-[160px] px-4 py-3 font-medium">{b.fullName || "—"}</td>
                             <td className="whitespace-nowrap px-4 py-3 tabular-nums">{b.phone || "—"}</td>
                             <td className="max-w-[200px] break-all px-4 py-3 text-mucamas-muted">{b.email || "—"}</td>
-                            <td className="whitespace-nowrap px-4 py-3">{b.estado ?? "—"}</td>
+                            <td className="px-4 py-3 align-top">
+                              {sessionKey ? (
+                                <BookingStatusControl
+                                  booking={b}
+                                  adminKey={sessionKey}
+                                  onApplied={mergeBooking}
+                                  onUnauthorized={handlePatchUnauthorized}
+                                />
+                              ) : (
+                                <span className="text-mucamas-muted">—</span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -313,7 +335,18 @@ export function AdminBookingsPanel() {
                         </div>
                         <div>
                           <dt className="text-xs font-semibold uppercase tracking-wide text-mucamas-muted">Estado</dt>
-                          <dd className="mt-1">{b.estado ?? "—"}</dd>
+                          <dd className="mt-2">
+                            {sessionKey ? (
+                              <BookingStatusControl
+                                booking={b}
+                                adminKey={sessionKey}
+                                onApplied={mergeBooking}
+                                onUnauthorized={handlePatchUnauthorized}
+                              />
+                            ) : (
+                              <span className="text-mucamas-muted">—</span>
+                            )}
+                          </dd>
                         </div>
                       </dl>
                     </li>

@@ -24,6 +24,13 @@ export type AdminBookingsError = {
 
 export type AdminBookingsResponse = AdminBookingsSuccess | AdminBookingsError;
 
+export type PatchBookingSuccess = {
+  ok: true;
+  booking: AdminBookingDto;
+};
+
+export type PatchBookingResponse = PatchBookingSuccess | AdminBookingsError;
+
 function str(v: unknown): string {
   return typeof v === "string" ? v : v != null ? String(v) : "";
 }
@@ -34,12 +41,12 @@ function nullableStr(v: unknown): string | null {
   return s.length ? s : null;
 }
 
-/** Normaliza fila Supabase (`status` o `estado` en DB). */
+/** Normaliza fila Supabase: columna canónica `status` (fallback `estado` legacy). */
 export function mapBookingRowToDto(row: Record<string, unknown>): AdminBookingDto | null {
   const createdRaw = row.created_at;
   if (typeof createdRaw !== "string" || !createdRaw) return null;
 
-  const estadoRaw = row.estado ?? row.status;
+  const estadoRaw = row.status ?? row.estado;
 
   return {
     id: nullableStr(row.id),
