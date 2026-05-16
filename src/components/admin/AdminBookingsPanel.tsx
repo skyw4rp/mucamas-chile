@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useSyncExternalStore, useState } from "react";
+import { AdminStatsStrip } from "@/components/admin/AdminStatsStrip";
 import { BookingStatusControl } from "@/components/admin/BookingStatusControl";
+import type { AdminBookingStatsDto, AdminBookingStatsResponse } from "@/lib/admin/booking-stats";
 import type { AdminBookingDto, AdminBookingsResponse } from "@/lib/admin/booking-map";
 import {
   getAdminKeyServerSnapshot,
@@ -41,42 +43,117 @@ export function AdminBookingsPanel() {
   const sessionKey = useSyncExternalStore(subscribeAdminKey, getAdminKeySnapshot, getAdminKeyServerSnapshot);
   const [inputKey, setInputKey] = useState("");
   const [bookings, setBookings] = useState<AdminBookingDto[]>([]);
+  const [stats, setStats] = useState<AdminBookingStatsDto | null>(null);
   const [loading, setLoading] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
-  const loadBookings = useCallback(async (key: string, options?: { persistOnSuccess?: boolean }) => {
-    setLoading(true);
-    setError(null);
+  const refreshStats = useCallback(async (key: string) => {
+    setStatsLoading(true);
+    setStatsError(null);
     try {
-      const res = await fetch("/api/admin/bookings", {
-        method: "GET",
+      const res = await fetch("/api/admin/bookings/stats", {
         headers: {
           Accept: "application/json",
           "x-admin-key": key,
         },
       });
 
-      let data: AdminBookingsResponse;
+      let data: AdminBookingStatsResponse;
       try {
-        data = (await res.json()) as AdminBookingsResponse;
+        data = (await res.json()) as AdminBookingStatsResponse;
       } catch {
-        setError("Respuesta inválida del servidor.");
+        setStatsError("Respuesta inválida del servidor.");
         return;
       }
 
       if (res.status === 401 || !data.ok) {
         persistAdminKey(null);
         setBookings([]);
+        setStats(null);
         setError(data.ok === false ? data.message : "No autorizado.");
         return;
       }
 
-      setBookings(data.bookings);
-      if (options?.persistOnSuccess) persistAdminKey(key);
+      setStats(data.stats);
     } catch {
+      setStatsError("Sin conexión al actualizar métricas.");
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  const loadDashboard = useCallback(async (key: string, options?: { persistOnSuccess?: boolean }) => {
+    setLoading(true);
+    setStatsLoading(true);
+    setError(null);
+    setStatsError(null);
+
+    try {
+      const headers: HeadersInit = {
+        Accept: "application/json",
+        "x-admin-key": key,
+      };
+
+      const [bookRes, statRes] = await Promise.all([
+        fetch("/api/admin/bookings", { headers }),
+        fetch("/api/admin/bookings/stats", { headers }),
+      ]);
+
+      let bookData: AdminBookingsResponse;
+      let statData: AdminBookingStatsResponse;
+
+      try {
+        bookData = (await bookRes.json()) as AdminBookingsResponse;
+      } catch {
+        setBookings([]);
+        setError("Respuesta inválida del servidor (reservas).");
+        bookData = { ok: false, message: "JSON inválido." };
+      }
+
+      try {
+        statData = (await statRes.json()) as AdminBookingStatsResponse;
+      } catch {
+        setStats(null);
+        setStatsError("Respuesta inválida del servidor (métricas).");
+        statData = { ok: false, message: "JSON inválido." };
+      }
+
+      if (bookRes.status === 401 || statRes.status === 401) {
+        persistAdminKey(null);
+        setBookings([]);
+        setStats(null);
+        setError("No autorizado.");
+        setStatsError(null);
+        return;
+      }
+
+      if (!bookRes.ok || !bookData.ok) {
+        setBookings([]);
+        setError(bookData.ok === false ? bookData.message : `Error al cargar reservas (${bookRes.status}).`);
+      } else {
+        setBookings(bookData.bookings);
+        if (options?.persistOnSuccess) persistAdminKey(key);
+      }
+
+      if (!statRes.ok || !statData.ok) {
+        setStats(null);
+        setStatsError(
+          statData.ok === false ? statData.message : `Error al cargar métricas (${statRes.status}).`,
+        );
+      } else {
+        setStats(statData.stats);
+        setStatsError(null);
+      }
+    } catch {
+      setBookings([]);
+      setStats(null);
       setError("Sin conexión. Intenta nuevamente.");
+      setStatsError("Sin conexión al cargar métricas.");
     } finally {
       setLoading(false);
+      setStatsLoading(false);
     }
   }, []);
 
@@ -87,6 +164,8 @@ export function AdminBookingsPanel() {
   const handlePatchUnauthorized = useCallback(() => {
     persistAdminKey(null);
     setBookings([]);
+    setStats(null);
+    setStatsError(null);
     setError("Sesión admin inválida o expirada.");
   }, []);
 
@@ -94,9 +173,9 @@ export function AdminBookingsPanel() {
     const k = getAdminKeySnapshot();
     if (!k) return;
     queueMicrotask(() => {
-      void loadBookings(k);
+      void loadDashboard(k);
     });
-  }, [loadBookings]);
+  }, [loadDashboard]);
 
   function handleUnlock(e: React.FormEvent) {
     e.preventDefault();
@@ -107,17 +186,20 @@ export function AdminBookingsPanel() {
     }
     setError(null);
     setInputKey("");
-    void loadBookings(trimmed, { persistOnSuccess: true });
+    void loadDashboard(trimmed, { persistOnSuccess: true });
   }
 
   function handleLogout() {
     persistAdminKey(null);
     setBookings([]);
+    setStats(null);
+    setStatsError(null);
     setError(null);
     setInputKey("");
   }
 
   const unlocked = Boolean(sessionKey);
+  const dashboardBusy = loading || statsLoading;
 
   return (
     <div className="min-h-screen bg-mucamas-surface text-mucamas-ink">
@@ -137,8 +219,8 @@ export function AdminBookingsPanel() {
               <>
                 <button
                   type="button"
-                  onClick={() => sessionKey && void loadBookings(sessionKey)}
-                  disabled={loading}
+                  onClick={() => sessionKey && void loadDashboard(sessionKey)}
+                  disabled={dashboardBusy}
                   className="rounded-full border border-mucamas-border bg-white px-4 py-2 text-sm font-medium text-mucamas-ink shadow-sm transition hover:border-mucamas-petrol/25 disabled:opacity-60"
                 >
                   Actualizar
@@ -193,10 +275,10 @@ export function AdminBookingsPanel() {
               ) : null}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={dashboardBusy}
                 className="flex h-12 min-h-[44px] w-full items-center justify-center rounded-full bg-mucamas-petrol text-sm font-semibold text-white shadow-md transition hover:bg-mucamas-petrol-dark disabled:opacity-70"
               >
-                {loading ? "Cargando…" : "Ver reservas"}
+                {dashboardBusy ? "Cargando…" : "Ver reservas"}
               </button>
             </form>
           </section>
@@ -210,6 +292,8 @@ export function AdminBookingsPanel() {
                 </p>
               </div>
             </div>
+
+            <AdminStatsStrip stats={stats} loading={statsLoading} error={statsError} />
 
             {error ? (
               <div
@@ -280,6 +364,7 @@ export function AdminBookingsPanel() {
                                   adminKey={sessionKey}
                                   onApplied={mergeBooking}
                                   onUnauthorized={handlePatchUnauthorized}
+                                  onStatsRefresh={() => sessionKey && void refreshStats(sessionKey)}
                                 />
                               ) : (
                                 <span className="text-mucamas-muted">—</span>
@@ -342,6 +427,7 @@ export function AdminBookingsPanel() {
                                 adminKey={sessionKey}
                                 onApplied={mergeBooking}
                                 onUnauthorized={handlePatchUnauthorized}
+                                onStatsRefresh={() => sessionKey && void refreshStats(sessionKey)}
                               />
                             ) : (
                               <span className="text-mucamas-muted">—</span>

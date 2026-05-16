@@ -31,9 +31,16 @@ type Props = {
   adminKey: string;
   onApplied: (next: AdminBookingDto) => void;
   onUnauthorized: () => void;
+  onStatsRefresh?: () => void;
 };
 
-export function BookingStatusControl({ booking, adminKey, onApplied, onUnauthorized }: Props) {
+export function BookingStatusControl({
+  booking,
+  adminKey,
+  onApplied,
+  onUnauthorized,
+  onStatsRefresh,
+}: Props) {
   const rowId = booking.id;
   const [pending, setPending] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -91,6 +98,7 @@ export function BookingStatusControl({ booking, adminKey, onApplied, onUnauthori
       }
 
       onApplied(data.booking);
+      onStatsRefresh?.();
     } catch {
       onApplied(snapshot);
       setLocalError("Sin conexión.");
